@@ -22,7 +22,7 @@ uint8_t val[5];
 #define buffsize PAYLOAD_LENGTH
 uint8_t buff[buffsize];
 
-//float TT=0, HH=0;
+uint8_t wtd_counter=0;
 float TT, HH;
 
 uint8_t addrtx0[5]=ADDRP0;
@@ -100,54 +100,52 @@ ISR(INT0_vect){
 }
 
 ISR(TWI_vect){}
+	
 ISR(WDT_vect){
-	//cli();
-	power_twi_enable();
-	//wdt_disable();
 	
-	twi_init();
-	TT = twi_sht21_get(1); // temperature
-	//_delay_ms(100);
-	HH = twi_sht21_get(2); // humidity
+	if (wtd_counter >= 4){
+		power_twi_enable();
+		twi_init();
+		TT = twi_sht21_get(1); // temperature
+		HH = twi_sht21_get(2); // humidity
 
-	buff[0]=0;
-	buff[1]=25;
-	buff[3]=1;
-	buff[4]=(uint8_t)(TT);
-	buff[5]=(uint8_t)((int8_t)(TT*10)-((int8_t)(TT))*10);
-	buff[6]=2;
-	buff[7]=(uint8_t)(HH);
-	buff[8]=(uint8_t)((int8_t)(HH*10)-((int8_t)(HH))*10);
-
-	_delay_ms(5);
-	twi_disable();
-	
-	power_spi_enable();
-	InitInterrupts();
-	_delay_ms(5);
-	NrfPortInit();
-	_delay_ms(5);
-	
-	if(NrfConfig() == 1){
-		//TransmitStringToUART("nRF24 configuration is finished... \r\n");
-		}else{
-		//TransmitStringToUART("Error in nRF24 configuration... \r\n");
+		buff[0]=0;
+		buff[1]=25;
+		buff[3]=1;
+		buff[4]=(uint8_t)(TT);
+		buff[5]=(uint8_t)((int8_t)(TT*10)-((int8_t)(TT))*10);
+		buff[6]=2;
+		buff[7]=(uint8_t)(HH);
+		buff[8]=(uint8_t)((int8_t)(HH*10)-((int8_t)(HH))*10);
+		twi_disable();
+		power_twi_disable();
+		
+		power_spi_enable();
+		InitInterrupts();
+		_delay_ms(5);
+		NrfPortInit();
+		_delay_ms(5);
+		
+		if(NrfConfig() == 1){
+			//TransmitStringToUART("nRF24 configuration is finished... \r\n");
+			}else{
+			//TransmitStringToUART("Error in nRF24 configuration... \r\n");
+		}
+		
+		_delay_ms(5);
+		transmit_payload(addrtx1, &buff[0], PAYLOAD_LENGTH);
+		wtd_counter=0;
+	}else{
+		wtd_counter++;
+		wdt_reset();
+		wdt_enable(WDTO_8S);
+		WDTCSR |= (1<<WDIE);
+		sei();
+		set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+		sleep_enable();
+		sleep_bod_disable();
+		sleep_cpu();
 	}
-	
-	_delay_ms(5);
-	transmit_payload(addrtx1, &buff[0], PAYLOAD_LENGTH);
-	
-	//_delay_ms(5000);
-	//power_spi_disable();
-	power_twi_disable();
-	//wdt_reset();
-	//wdt_enable(WDTO_8S);
-	//WDTCSR |= (1<<WDIE);
-	//sei();
-	//set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-	//sleep_enable();
-	//sleep_bod_disable();
-	//sleep_cpu();
 }
 	
 int main(void){
